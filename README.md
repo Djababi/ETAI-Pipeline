@@ -1,3 +1,10 @@
+
+## Conclusions 
+Best Model for now: LogisticRegression
+
+Although it shows low performance (accuracy) on the test data. The decision tree model has an overfitting problem, performing better on the training data than on the test data.
+
+
 # Baseline Predictive Pipeline -- ETAI
 
 This is the **starting point** for your semester project: a small but *complete* predictive pipeline -- every piece a real project needs (entry point, config, data loading, preprocessing, model, evaluation), just kept as simple as possible for now.
@@ -111,3 +118,4 @@ You're free to improve on this structure or restructure it entirely -- what matt
 ## Dataset
 
 See `data/README.md`.
+
