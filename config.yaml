@@ -12,8 +12,8 @@ split:
   random_state: 42
 
 model:
-  type: "decision_tree"   # or "decision_tree"
-  params: {}
+  type: "logistic_regression"   # or "decision_tree"
+  params: {'max_iter': 1000}
     #max_iter: 1000
 
 output:
