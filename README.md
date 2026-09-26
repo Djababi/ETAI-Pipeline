@@ -1,8 +1,16 @@
 
 ## Conclusions 
+
+### week 3
+Best Model for now:  LogisticRegression
+
+After the cleaning step, the Decision Tree still overfits. The gap between train and test went down a little (0.202 → 0.194), but mostly because train accuracy dropped, and test accuracy dropped too (0.627 → 0.605), so cleaning alone isn't enough to fix it. The Logistic Regression changed a bit more than expected: test accuracy went from 0.679 to 0.655. This is probably because more rows now get dropped as missing values (invalid values and placeholders became NaN), so the model has less data to work with. The biggest improvement is in the false positive rate report. Before, the same race showed up under several spellings (e.g. "African-American", "AFRICAN-AMERICAN", "african-american") and placeholders like "-" and "?" were counted as separate groups. Now each group appears only once.
+
+### week 2
 Best Model for now: LogisticRegression
 
 Although it shows low performance (accuracy) on the test data. The decision tree model has an overfitting problem, performing better on the training data than on the test data.
+
 
 
 # Baseline Predictive Pipeline -- ETAI
