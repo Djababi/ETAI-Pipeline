@@ -1,6 +1,13 @@
 
 ## Conclusions 
 
+### week 4
+Best Model for now:  LogisticRegression
+
+With imputation, encoding and scaling in place, no rows are lost to missing values anymore: the test set went from 1188 to 1443 people. All models clearly beat the Dummy baseline (0.550). Logistic Regression is still the best model (0.658 test accuracy, slightly up from 0.655) and barely overfits (gap of 0.018). The Decision Tree's gap was cut by more than half (0.194 → 0.088), but its test accuracy stayed the same (0.606). The improvement comes from the model memorising less of the training data, not from better predictions. Random Forest lands in between (0.642), also with some overfitting. On fairness, the gap remains: for Logistic Regression, the FPR is 0.28 for African-American defendants vs 0.14 for Caucasian defendants (previously 0.30 vs 0.16). Random Forest reaches 0.44 for African-American defendants, the same as COMPAS's own score.
+
+
+
 ### week 3
 Best Model for now:  LogisticRegression
 
