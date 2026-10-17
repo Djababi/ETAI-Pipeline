@@ -1,6 +1,26 @@
 
 ## Conclusions 
 
+### week 5
+Best Model for now: RandomForest (tuned) -- but only by a small margin
+
+#### Hyperparameter tuning
+How it works: for each model, **Optuna** (TPE sampler, seed 42) tries different hyperparameter values and keeps the ones with the best mean accuracy over **5 inner folds** (30 trials for the tree and logistic regression, 15 for the slower random forest). The search spaces live in `config.yaml` (`tuning.search_spaces`): `max_depth`, `min_samples_leaf` and `criterion` for the tree, `C` (log scale) for logistic regression, and `n_estimators`, `max_depth`, `min_samples_leaf` and `max_features` for the forest.
+
+Why it doesn't leak: tuning only uses the development set (the test set stays locked), every candidate is the **whole pipeline** (imputer, encoder, scaler and model are re-fit inside every fold), and all candidates are scored on the same folds. The best trial's score is a bit optimistic (it is the maximum of many noisy scores), so the number we report comes from **nested CV**: the inner folds choose the hyperparameters, the outer folds score them on rows that took no part in that choice.
+
+| Model | Default: CV mean ± std | Tuned: nested CV mean ± std | Tuning score (best trial) | Optimism | Chosen hyperparameters |
+|---|---|---|---|---|---|
+| Decision tree | 0.610 ± 0.018 | 0.672 ± 0.017 | 0.679 | +0.002 | `max_depth=6`, `min_samples_leaf=101`, `criterion=gini` |
+| Logistic regression | 0.672 ± 0.013 | 0.673 ± 0.016 | 0.678 | +0.002 | `C=0.072` |
+| Random forest | 0.647 ± 0.016 | 0.679 ± 0.013 | 0.682 | +0.001 | `n_estimators=133`, `max_depth=8`, `min_samples_leaf=24`, `max_features=log2` |
+
+*Optimism = mean tuning score inside the outer folds − mean honest score on the outer folds.*
+
+The **decision tree** gained the most from tuning: from 0.610 to 0.672 (+0.062, more than 3× the fold-to-fold std). This happened because tuning forced the tree to be smaller (depth 6, at least 101 people per leaf), so it stopped memorising: the train–validation gap dropped from 0.085 to 0.013. The **random forest** also improved clearly (+0.032, about 2× the std) for the same reason. **Logistic regression** barely changed (+0.001, much smaller than the std): it is a simple linear model that was already not overfitting (gap ≈ 0), so there was little left to fix, and stronger regularisation (`C=0.072`) only made a tiny difference. After tuning, the three models are very close (0.672 – 0.679), and these differences are **smaller than the std**, so the random forest is not clearly better. Logistic regression is still a strong choice because it is simpler and had the lowest false positive rates in the fairness check (0.25 African-American vs 0.12 Caucasian; the tuned forest is 0.30 vs 0.16). For our best model, we report the **nested CV score (0.679 ± 0.013)**, not the best trial score (0.682), because that one was used to choose the model and is therefore a bit optimistic.
+
+
+
 ### week 4
 Best Model for now:  LogisticRegression
 
@@ -44,6 +64,7 @@ go on.
 │   ├── preprocessing.py    # cleaning + train/test split
 │   ├── model.py             # model construction
 │   ├── evaluate.py         # accuracy metrics + fairness check
+│   ├── tuning.py           # hyperparameter tuning (Optuna) + nested CV
 │   └── results.py          # saves each run's report to disk
 ├── results/                # created automatically -- one file per run (not tracked in git)
 └── data/
@@ -58,6 +79,7 @@ This table is updated after each practical class, so you can always see what cha
 | Week | Practical class focus | Added to the pipeline |
 |------|------------------------|------------------------|
 | 2 | Introduction & baseline pipeline | Initial version: project structure, a single naive train/test split (no cross-validation), minimal preprocessing (drop rows with missing values, one-hot encode categoricals), logistic regression baseline, a first (deliberately simple) fairness check comparing our model's and COMPAS's own false-positive rate by race, train-vs-test accuracy reporting (to start spotting overfitting), and each run's full report saved automatically to `results/` |
+| 5 | Hyperparameter tuning | `src/tuning.py` (new): Optuna tuning of the whole pipeline (`tune_pipeline()`), an honest score with nested cross-validation (`nested_cross_validate()`) and a tuning report with the optimism check (`tuning_report()`); `build_pipeline()` in `src/model.py`; a `tuning` section in `config.yaml` (on/off, number of trials, folds, one search space per model); `optuna` added to `requirements.txt` |
 
 ## Environment setup
 

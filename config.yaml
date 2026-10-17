@@ -84,14 +84,39 @@ preprocessing:
     }
 
 
+cv:
+  n_splits: 5
+  shuffle: true
+  random_state: 42
+  scoring: "accuracy"
+  n_jobs: -1
+
+tuning:
+  enabled: true
+  n_trials: 15
+  n_splits: 5                                       # folds that score each candidate
+  random_state: 42                                  # seeds the sampler and those folds
+  # Keys are Pipeline parameter names. Types: int / float (low, high, log) or categorical (choices).
+  search_spaces:
+    decision_tree:
+      model__max_depth: {type: int, low: 1, high: 20}
+      model__min_samples_leaf: {type: int, low: 1, high: 200, log: true}
+      model__criterion: {type: categorical, choices: ["gini", "entropy"]}
+    # challenge 1: C = regularisation strength (smaller = stronger), searched on a log scale
+    logistic_regression:
+      model__C: {type: float, low: 0.0001, high: 100, log: true}
+    # challenge 2: a forest is ~100x slower per trial -- use n_trials: 15 and cv.n_jobs: -1 for it
+    random_forest:
+      model__n_estimators: {type: int, low: 50, high: 200}
+      model__max_depth: {type: categorical, choices: [3, 5, 8, 12, null]}   # null = None (no limit)
+      model__min_samples_leaf: {type: int, low: 1, high: 100, log: true}
+      model__max_features: {type: categorical, choices: ["sqrt", "log2", 0.5, 1.0]}
 
 
-
-  
 model:
-  type: "logistic_regression"   # or "decision_tree"
-  params: {'max_iter': 1000}
-    #max_iter: 1000
+  type: "random_forest"    # dummy | logistic_regression | decision_tree | random_forest
+  params:   {random_state: 42}
+    # max_iter: 1000
 
 output:
   results_dir: "results"   # each run's full report is saved here as a timestamped .txt file

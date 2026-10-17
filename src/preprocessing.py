@@ -20,6 +20,7 @@ from sklearn.preprocessing import (
     OneHotEncoder, OrdinalEncoder,  TargetEncoder, StandardScaler, MinMaxScaler, RobustScaler,
 )
 from sklearn.model_selection import StratifiedKFold
+from category_encoders import CountEncoder
 
 def preprocess(
     df: pd.DataFrame,
@@ -161,7 +162,7 @@ _SCALERS = {"none": "passthrough", "standard": StandardScaler, "minmax": MinMaxS
 _ENCODERS = {
     "onehot": lambda seed: OneHotEncoder(handle_unknown="ignore", sparse_output=False),
     "ordinal": lambda seed: OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
-    #"count": lambda seed: CountEncoder(handle_unknown=0, handle_missing=0),
+    "count": lambda seed: CountEncoder(handle_unknown=0, handle_missing=0),
     "target": lambda seed: TargetEncoder(target_type="binary", cv=StratifiedKFold(5, shuffle=True, random_state=seed)),
 }
 

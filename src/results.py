@@ -23,8 +23,17 @@ def save_run(results_dir: str, config: dict, report_text: str) -> str:
         f"Model: {config['model']['type']}  params={config['model']['params']}\n"
         f"Test size: {config['split']['test_size']}  "
         f"random_state: {config['split']['random_state']}\n"
-        + "=" * 60 + "\n\n"
     )
+    tuning = config.get("tuning", {})
+    if tuning.get("enabled", False):
+        header += (
+            f"Tuning: Optuna TPE, n_trials={tuning['n_trials']}  inner folds={tuning['n_splits']}  "
+            f"random_state={tuning['random_state']}\n"
+            f"Search space: {tuning['search_spaces'].get(config['model']['type'])}\n"
+        )
+    else:
+        header += "Tuning: off\n"
+    header += "=" * 60 + "\n\n"
 
     with open(path, "w") as f:
         f.write(header + report_text)
