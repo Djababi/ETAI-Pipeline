@@ -70,7 +70,10 @@ preprocessing:
                           'juv_fel_count',
                           'juv_misd_count',
                           'juv_other_count',
-                          'priors_count'],
+                          'priors_count',  
+                          "priors_per_adult_year",
+                          "juv_total",
+                          "juv_per_year_since_14"],
 
     'categorical_features': ['sex', 'age_cat', 'c_charge_degree'],
 
@@ -88,7 +91,9 @@ cv:
   n_splits: 5
   shuffle: true
   random_state: 42
-  scoring: "accuracy"
+  # week 7: reported for every run. fbeta_<beta> weights recall beta times as much as precision.
+  metrics: ["accuracy", "balanced_accuracy", "precision", "recall", "f1", "fbeta_2", "roc_auc", "average_precision"]
+  selection_metric: "roc_auc"                       # one of metrics: what tuning maximises and runs are ranked by
   n_jobs: -1
 
 tuning:
@@ -107,18 +112,65 @@ tuning:
       model__C: {type: float, low: 0.0001, high: 100, log: true}
     # challenge 2: a forest is ~100x slower per trial -- use n_trials: 15 and cv.n_jobs: -1 for it
     random_forest:
-      model__n_estimators: {type: int, low: 50, high: 200}
+      
       model__max_depth: {type: categorical, choices: [3, 5, 8, 12, null]}   # null = None (no limit)
       model__min_samples_leaf: {type: int, low: 1, high: 100, log: true}
       model__max_features: {type: categorical, choices: ["sqrt", "log2", 0.5, 1.0]}
+    
+    oblique_random_forest:
+      model__estimator__tree__max_depth: {type: int, low: 2, high: 30}
+      model__estimator__tree__min_samples_leaf: {type: int, low: 1, high: 200, log: true}
+      model__estimator__project__n_components: {type: int, low: 3, high: 10}   # <= nº de features
+
+    adaboost:
+      model__estimator__max_depth: {type: int, low: 1, high: 8}
+      model__n_estimators: {type: int, low: 25, high: 400, log: true}
+      model__learning_rate: {type: float, low: 0.01, high: 1.0, log: true}
+
+    # week 6, Challenge 2: AdaBoost over logistic regressions
+    adaboost_logistic:
+      model__estimator__C: {type: float, low: 0.0001, high: 100, log: true}
+      model__n_estimators: {type: int, low: 10, high: 200, log: true}
+      model__learning_rate: {type: float, low: 0.01, high: 1.0, log: true}
+
+    # week 7: the boosters tune the number of trees, the learning rate and the tree size TOGETHER
+    gradient_boosting:
+      model__n_estimators: {type: int, low: 25, high: 500, log: true}
+      model__learning_rate: {type: float, low: 0.01, high: 0.5, log: true}
+      model__max_depth: {type: int, low: 1, high: 6}
+      model__min_samples_leaf: {type: int, low: 1, high: 200, log: true}
+      model__subsample: {type: float, low: 0.5, high: 1.0}
+    hist_gradient_boosting:
+      model__max_iter: {type: int, low: 25, high: 500, log: true}
+      model__learning_rate: {type: float, low: 0.01, high: 0.5, log: true}
+      model__max_leaf_nodes: {type: int, low: 2, high: 63, log: true}
+      model__min_samples_leaf: {type: int, low: 5, high: 200, log: true}
+      model__l2_regularization: {type: float, low: 0.000001, high: 10.0, log: true}
+    # var_smoothing: share of the largest feature variance added to every variance (stability)
+    naive_bayes:
+      model__var_smoothing: {type: float, low: 1.0e-12, high: 1.0, log: true}
 
 
 model:
-  type: "random_forest"    # dummy | logistic_regression | decision_tree | random_forest
-  params:   {random_state: 42}
-    # max_iter: 1000
+  type: "gradient_boosting"  # dummy | logistic_regression | naive_bayes | decision_tree | random_forest | oblique_random_forest | adaboost | adaboost_logistic | gradient_boosting | hist_gradient_boosting
+  params:
+    random_state: 42
+  # Other models' params, to swap in. class_weight "balanced" weights each class by 1 / its frequency
+  # (GradientBoostingClassifier, GaussianNB and AdaBoost have no class_weight).
+  # dummy:                  {}
+  # logistic_regression:    {max_iter: 2000, class_weight: balanced}
+  # naive_bayes:            {}
+  # decision_tree:          {random_state: 42, class_weight: balanced}
+  # random_forest:          {n_estimators: 200, random_state: 42, n_jobs: -1, class_weight: balanced}  # more trees never overfit, they only cost time
+  # oblique_random_forest:  {n_estimators: 200, n_components: 10, random_state: 42, n_jobs: -1}
+  # adaboost:               {max_depth: 1, n_estimators: 200, learning_rate: 1.0, random_state: 42}
+  # adaboost_logistic:      {n_estimators: 50, learning_rate: 1.0, random_state: 42}
+  # gradient_boosting:      {random_state: 42}
+  # hist_gradient_boosting: {random_state: 42, class_weight: balanced}
 
 output:
   results_dir: "results"   # each run's full report is saved here as a timestamped .txt file
+  # week 7: one row per run. Delete it when the data, cleaning or CV folds change (runs are no longer comparable).
+  scoreboard: "results/runs.csv"
 
 

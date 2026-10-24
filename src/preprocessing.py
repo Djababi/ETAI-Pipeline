@@ -204,3 +204,19 @@ def build_preprocessor(preprocessing_config: dict) -> ColumnTransformer:
         ("indicators", "passthrough", indicator_cols),
     ])
 #------------------------------------------------------
+
+
+def add_engineered_features(df: pd.DataFrame) -> pd.DataFrame:
+    # EXAMPLE (Challenge 1). Fixed formulas only -- nothing is learned, so this is safe before the split.
+    out = df.copy()
+
+    juv = ["juv_fel_count", "juv_misd_count", "juv_other_count"]
+    out["juv_total"] = out[juv].sum(axis=1)
+
+    out['total_priors'] = out[["juv_total", 'priors_count']].sum(axis=1)
+    out["juv_per_year_since_14"] = out["juv_total"] / (out["age"] - 13).clip(lower=1)
+    
+
+
+    out["priors_per_adult_year"] = out["priors_count"] / (out["age"] - 17).clip(lower=1)   # NaN stays NaN -> imputed later
+    return out

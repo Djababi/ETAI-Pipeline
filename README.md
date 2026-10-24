@@ -1,5 +1,78 @@
 
-## Conclusions 
+## Conclusions
+
+### week 7: Boosting and metrics
+
+**Selection metric: ROC-AUC.** COMPAS is a risk score used to *rank* people, and choosing the cut-off for "high risk" is a separate decision. ROC-AUC scores the ranking at every threshold at once, so it doesn't depend on the 0.5 cut-off, and it is less noisy than accuracy for comparing models. The other 7 metrics are still reported in every run.
+
+**Scoreboard** (`results/runs.csv`, ROC-AUC, nested CV with 15 trials, the same 5 folds, new features included, floor = dummy = 0.500):
+
+| Model | Tuned: nested ROC-AUC mean ± std | Untuned | Chosen hyperparameters |
+|---|---|---|---|
+| Oblique random forest | **0.726 ± 0.012** | 0.680 | tree max_depth 8, min_samples_leaf 170, n_components 10 |
+| Random forest | 0.725 ± 0.011 | 0.683 | max_depth 8, min_samples_leaf 20, max_features sqrt |
+| Gradient boosting | 0.725 ± 0.013 | 0.726 | n_estimators 172, learning_rate 0.083, max_depth 1, min_samples_leaf 10, subsample 0.59 |
+| AdaBoost | 0.725 ± 0.012 | 0.722 | max_depth 4, n_estimators 220, learning_rate 0.025 |
+| HistGradientBoosting | 0.725 ± 0.014 | 0.713 | max_iter 120, learning_rate 0.047, max_leaf_nodes 6, min_samples_leaf 123, l2 0.55 |
+| Logistic regression | 0.723 ± 0.012 | 0.723 | C 0.00086 |
+| Naive Bayes | 0.720 ± 0.011 | 0.696 | var_smoothing 0.77 |
+| Decision tree | 0.717 ± 0.010 | 0.592 | max_depth 8, min_samples_leaf 149, gini |
+| AdaBoost (logistic) | 0.715 ± 0.009 | 0.705 | C 0.018, n_estimators 173, learning_rate 0.29 |
+| Dummy (floor) | 0.500 ± 0.000 | 0.500 | — |
+
+The five ensembles are tied at 0.725–0.726. With the corrected paired t-test, the best (oblique RF) is **not** significantly better than the random forest, the boosters or logistic regression (p from 0.14 to 0.82). It is only significantly better than Naive Bayes, the single tree and AdaBoost-logistic (p ≈ 0.02–0.04, all 5 folds). Tuning matters most for the models that overfit by default (tree 0.592 → 0.717, forests 0.68 → 0.725). Gradient boosting and logistic regression were already good with their defaults.
+
+### week 6: Ensembles
+
+Best Model for now: AdaBoost
+
+| Model | Default: CV mean ± std (gap) | Tuned: nested CV mean ± std (gap) | Tuning score (best trial) | Chosen hyperparameters |
+|---|---|---|---|---|
+| Logistic regression |0.672 ± 0.013(+0.003)| — | — | — |
+
+| Decision tree | 0.610 ± 0.018(+0.085) | 0.671 ± 0.015 (+0.013) | 0.671 | max_depth': 8, 'min_samples_leaf': 149, 'criterion': 'gini' |
+
+| Random forest |0.647 ± 0.016(+0.085) | 0.679 ± 0.013(+0.009) | 0.682 | n_estimators': 133, 'max_depth': 8, 'min_samples_leaf': 24, 'max_features': 'log2' |
+
+| Oblique random forest | 0.647 ± 0.011(+0.114) | 0.682 ± 0.015(+0.010) |  0.683 | 'estimator__tree__max_depth': 6, 'estimator__tree__min_samples_leaf': 3, 'model__estimator__project__n_components': 5 |
+
+| AdaBoost | 0.676± 0.012(+0.006) |0.684± 0.014(+0.004) | 0.684 | estimator__max_depth': 4, 'n_estimators': 220, 'learning_rate': 0.025081156860452335 |
+
+
+I would choose AdaBoost, because it has the highest mean score on the outer folds of nested CV among the ensembles. However, this alone is not a decisive criterion: its standard deviation across folds (0.014) is almost the same as the Oblique RF's (0.015). Since its lead (0.002) is smaller than its standard deviation, the difference is probably just noise. AdaBoost only scored higher than the Oblique RF on some folds and lower on others. Still, I would choose **AdaBoost** as the final model, because it is at least as stable as the Oblique RF (std 0.014 vs 0.015) and overfits less (train–validation gap of +0.004 vs +0.010).
+
+
+Challenge 1
+
+New features: `priors_per_adult_year` = priors / years since 18, `juv_total` = sum of the three juvenile counts, `juv_per_year_since_14` = juv_total / years since 14.
+
+-----After new features------
+
+| Model | Default: CV mean ± std (gap) | Tuned: nested CV mean ± std (gap) | Tuning score (best trial) | Chosen hyperparameters |
+|---|---|---|---|---|
+| Logistic regression | 0.675 ± 0.011 (+0.001) | 0.676 ± 0.012 (+0.001) | 0.675 | 'C': 0.0219 |
+| Random forest | 0.642 ± 0.016 (+0.105) | 0.672 ± 0.009 (+0.019) | 0.678 | 'max_depth': 5, 'min_samples_leaf': 1, 'max_features': 'log2' |
+| AdaBoost | 0.674 ± 0.009 (+0.007) | 0.674 ± 0.012 (+0.011) | 0.678 | 'estimator__max_depth': 4, 'n_estimators': 220, 'learning_rate': 0.0251 |
+
+*Nested CV, accuracy, 15 Optuna trials, the same 5 outer folds. The "before" numbers were re-run with exactly the same settings: logistic regression 0.673 ± 0.016, random forest 0.679 ± 0.015, AdaBoost 0.684 ± 0.014.*
+
+| Model | Nested before | Nested after | Difference | Folds that improved |
+|---|---|---|---|---|
+| Logistic regression | 0.673 | 0.676 | **+0.003** | 4 of 5 |
+| Random forest | 0.679 | 0.672 | **−0.008** | 1 of 5 |
+| AdaBoost | 0.684 | 0.674 | **−0.010** | 0 of 5 |
+
+**Comparison.** Only **logistic regression** gains from the new features (+0.003, in 4 of 5 folds), but the gain is smaller than the fold std (0.012), so it could be noise. A linear model can't divide priors by age on its own, so a ready-made rate can only help it. The **tree models get worse**: the random forest loses 0.008 and AdaBoost loses 0.010 (in all 5 folds, about the size of the std). Trees can already approximate these rates by splitting on `age` and `priors_count`, so the new columns add no information. They mostly add correlated, noisy columns for the trees to overfit on (the train–validation gap grows: forest +0.009 → +0.019, AdaBoost +0.004 → +0.011). Conclusion: these features are only worth keeping for logistic regression, and even there the gain is not clearly bigger than the noise.
+
+Challenge 2 (b) – AdaBoost with a logistic regression as the base model (`model.type: adaboost_logistic`)
+
+| Model | Default: CV mean ± std (gap) | Tuned: nested CV mean ± std (gap) | Tuning score (best trial) | Chosen hyperparameters |
+|---|---|---|---|---|
+| AdaBoost (estimator = LogisticRegression) | 0.675 ± 0.010 (+0.000) | 0.677 ± 0.012 (+0.001) | 0.677 | 'estimator__C': 5.10, 'n_estimators': 49, 'learning_rate': 0.0573 |
+
+Boosting barely helps the linear model: 0.677 vs 0.676 for plain logistic regression on the same folds (+0.001, much smaller than the std). That is expected. AdaBoost's final model is a **weighted sum of linear models**, and a sum of linear functions is **still linear**, so the decision boundary is still a straight line (hyperplane). Boosting can only move or tilt it a little, never bend it the way it does with trees. Boosting needs weak learners that are *different* from each other, and logistic regressions trained on re-weighted rows all end up very similar.
+
+
 
 ### week 5
 Best Model for now: RandomForest (tuned) -- but only by a small margin
@@ -80,6 +153,8 @@ This table is updated after each practical class, so you can always see what cha
 |------|------------------------|------------------------|
 | 2 | Introduction & baseline pipeline | Initial version: project structure, a single naive train/test split (no cross-validation), minimal preprocessing (drop rows with missing values, one-hot encode categoricals), logistic regression baseline, a first (deliberately simple) fairness check comparing our model's and COMPAS's own false-positive rate by race, train-vs-test accuracy reporting (to start spotting overfitting), and each run's full report saved automatically to `results/` |
 | 5 | Hyperparameter tuning | `src/tuning.py` (new): Optuna tuning of the whole pipeline (`tune_pipeline()`), an honest score with nested cross-validation (`nested_cross_validate()`) and a tuning report with the optimism check (`tuning_report()`); `build_pipeline()` in `src/model.py`; a `tuning` section in `config.yaml` (on/off, number of trials, folds, one search space per model); `optuna` added to `requirements.txt` |
+| 6 | Ensembles | `oblique_random_forest()` and `adaboost()` in `src/model.py` (+ `adaboost_logistic()`, Challenge 2); their search spaces in `config.yaml`; `add_engineered_features()` in `src/preprocessing.py` (Challenge 1: `priors_per_adult_year`, `juv_total`, `juv_per_year_since_14`) |
+| 7 | Boosting and metrics | `gradient_boosting`, `hist_gradient_boosting` and `naive_bayes` in `_MODELS` with search spaces; several metrics from out-of-fold **probabilities** (`build_scorers()`, `cv.metrics`), one `cv.selection_metric` (ROC-AUC) for tuning and ranking; confusion matrix in the report; `corrected_paired_test()`; the scoreboard `results/runs.csv` (`save_scores()`). Plain-language explanation: `EXPLICACAO_SEMANAS_6_7.md` |
 
 ## Environment setup
 
