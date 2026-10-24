@@ -29,13 +29,9 @@ Best Model for now: AdaBoost
 | Model | Default: CV mean ± std (gap) | Tuned: nested CV mean ± std (gap) | Tuning score (best trial) | Chosen hyperparameters |
 |---|---|---|---|---|
 | Logistic regression |0.672 ± 0.013(+0.003)| — | — | — |
-
 | Decision tree | 0.610 ± 0.018(+0.085) | 0.671 ± 0.015 (+0.013) | 0.671 | max_depth': 8, 'min_samples_leaf': 149, 'criterion': 'gini' |
-
 | Random forest |0.647 ± 0.016(+0.085) | 0.679 ± 0.013(+0.009) | 0.682 | n_estimators': 133, 'max_depth': 8, 'min_samples_leaf': 24, 'max_features': 'log2' |
-
 | Oblique random forest | 0.647 ± 0.011(+0.114) | 0.682 ± 0.015(+0.010) |  0.683 | 'estimator__tree__max_depth': 6, 'estimator__tree__min_samples_leaf': 3, 'model__estimator__project__n_components': 5 |
-
 | AdaBoost | 0.676± 0.012(+0.006) |0.684± 0.014(+0.004) | 0.684 | estimator__max_depth': 4, 'n_estimators': 220, 'learning_rate': 0.025081156860452335 |
 
 
