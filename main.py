@@ -6,9 +6,12 @@ Run with:
 
 This orchestrates the full pipeline:
     load config -> load data -> clean -> engineered features -> split (development / locked test)
-    -> no-model floor + cross-validate on development (every metric) -> [tune: nested CV + Optuna study]
+    -> [feature selection inside the pipeline] -> no-model floor + cross-validate on development (every metric) -> [tune: nested CV + Optuna study]
     -> reports -> refit final model -> save results + scoreboard row
 """
+import shutil
+import tempfile
+import time
 from datetime import datetime
 
 import yaml
@@ -16,7 +19,7 @@ from sklearn.model_selection import StratifiedKFold
 
 from src.data import load_data
 from src.preprocessing import data_cleaning, preprocess, drop_duplicate_rows, add_engineered_features
-from src.model import build_pipeline
+from src.model import build_pipeline, describe_selection
 from src.evaluate import (
     build_cv, build_scorers, cross_validate_pipeline, cv_report, oof_classification_report, fairness_report,
 )
@@ -32,6 +35,7 @@ def load_config(path: str = "config.yaml") -> dict:
 def main():
     config = load_config()
     run = datetime.now().strftime("%Y%m%d_%H%M%S")
+    start = time.time()
     model_type = config["model"]["type"]
 
     df = load_data(config["data"]["path"])
@@ -55,11 +59,17 @@ def main():
     selection_metric = cv_config["selection_metric"]
     scorers = build_scorers(metrics)
     n_jobs = cv_config.get("n_jobs", 1)
+    # week 8: feature selection is a step of the pipeline (re-fit in every fold, never on all rows)
+    selection_config = config.get("feature_selection") or {}
+    selection_enabled = selection_config.get("enabled", False)
+    selection = describe_selection(selection_config)
     print(f"Model: {model_type}   |   selection metric: {selection_metric}   |   "
-          f"{cv_config['n_splits']}-fold CV")
+          f"{cv_config['n_splits']}-fold CV   |   feature selection: {selection}")
     print(f"Data:  {len(X_dev)} development rows   |   {len(X_test)} test rows locked away (not used)")
 
-    pipeline = build_pipeline(config['preprocessing'], config["model"])
+    # a new, empty cache folder per run: fitted prep + select steps are reused across trials, never across runs
+    cache_dir = tempfile.mkdtemp(prefix="pipeline_cache_")
+    pipeline = build_pipeline(config['preprocessing'], config["model"], selection_config, memory=cache_dir)
     # the no-model floor: a dummy on the same folds -- every real model must beat it
     floor_pipeline = build_pipeline(config['preprocessing'], {"type": "dummy"})
     floor_scores, _ = cross_validate_pipeline(floor_pipeline, X_dev, y_dev, cv,
@@ -84,7 +94,10 @@ def main():
         if model_type not in search_spaces:
             raise ValueError(f"tuning.enabled is true, but config.yaml has no search space for "
                              f"'{model_type}'. Add one under tuning.search_spaces, or set enabled: false.")
-        search_space = search_spaces[model_type]
+        search_space = dict(search_spaces[model_type])
+        if selection_enabled:   # week 8: how much to select is tuned with the model (nested CV keeps it honest)
+            method = selection_config.get("method", "vote")
+            search_space.update((selection_config.get("search_spaces") or {}).get(method) or {})
         n_trials = tuning_config["n_trials"]
         tuning_seed = tuning_config["random_state"]
         # inner folds: score each candidate (the outer folds are the usual `cv` above)
@@ -121,22 +134,32 @@ def main():
     pipeline.fit(X_dev, y_dev)
     refit = f"Final model: {model_type} refit on all {len(X_dev)} development rows."
     report += "\n" + refit + "\n"
+    if selection_enabled:
+        kept = list(pipeline[:-1].get_feature_names_out())
+        n_features = len(pipeline.named_steps["prep"].get_feature_names_out())
+        kept_line = f"Features kept: {len(kept)} of {n_features}: {', '.join(kept)}"
+        print(f"\n{kept_line}")
+        report += kept_line + "\n"
 
     # week 7: one row per run on the scoreboard -- only runs on the same data and metric are compared
     row = {"run": run, "data": config["data"]["path"], "model": model_type, "tuned": tuning_enabled,
-           "encoder": config["preprocessing"]["encoder"], "scaler": config["preprocessing"]["scaler"],
+           "feature_selection": selection, "encoder": config["preprocessing"]["encoder"], "scaler": config["preprocessing"]["scaler"],
            "params": str(config["model"].get("params")), "tuned_params": str(study.best_params) if tuning_enabled else "",
            "metric": selection_metric, "mean": final_scores["validation"].mean(),
            "std": final_scores["validation"].std(ddof=1), "untuned": untuned, "floor": floor,
+           "seconds": round(time.time() - start),
            **{f"fold_{i}": score for i, score in enumerate(final_scores["validation"], start=1)}}
     runs = save_scores(config.get("output", {}).get("scoreboard", "results/runs.csv"), row)
     same = runs[(runs["data"] == row["data"]) & (runs["metric"] == selection_metric)]
+    same = same.fillna({"feature_selection": "off"})   # runs from before week 8 had no selection step
     board = (same.sort_values("mean", ascending=False)
-             [["run", "model", "tuned", "encoder", "scaler", "mean", "std", "untuned", "floor"]]
+             [["run", "model", "tuned", "feature_selection", "encoder", "scaler", "mean", "std", "untuned", "floor"]]
              .rename(columns={"mean": selection_metric})
              .to_string(index=False, float_format=lambda v: f"{v:.3f}"))
     print(f"\nScoreboard (runs on the same data and metric; best first)\n{board}")
     report += f"\nScoreboard:\n{board}\n"
+
+    shutil.rmtree(cache_dir, ignore_errors=True)   # delete the cache folder and the fits stored in it
 
     path = save_run(config.get("output", {}).get("results_dir", "results"), run, config, report)
     print(f"\n{refit}\nFull report (per-fold tables, tuning, confusion matrix, fairness): {path}")

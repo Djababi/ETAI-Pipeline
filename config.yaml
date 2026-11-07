@@ -150,11 +150,24 @@ tuning:
     naive_bayes:
       model__var_smoothing: {type: float, low: 1.0e-12, high: 1.0, log: true}
 
+    # week 8: XGBoost, with its brakes inside each split (gamma, min_child_weight, reg_lambda, reg_alpha)
+    xgboost:
+      model__n_estimators: {type: int, low: 50, high: 600, log: true}
+      model__learning_rate: {type: float, low: 0.01, high: 0.3, log: true}
+      model__max_depth: {type: int, low: 1, high: 8}
+      model__min_child_weight: {type: float, low: 1.0, high: 50.0, log: true}
+      model__subsample: {type: float, low: 0.5, high: 1.0}
+      model__colsample_bytree: {type: float, low: 0.5, high: 1.0}
+      model__reg_lambda: {type: float, low: 0.01, high: 10.0, log: true}
+      model__reg_alpha: {type: float, low: 0.001, high: 10.0, log: true}
+      model__gamma: {type: float, low: 0.0, high: 5.0}
+
 
 model:
-  type: "gradient_boosting"  # dummy | logistic_regression | naive_bayes | decision_tree | random_forest | oblique_random_forest | adaboost | adaboost_logistic | gradient_boosting | hist_gradient_boosting
+  type: "xgboost"  # dummy | logistic_regression | naive_bayes | decision_tree | random_forest | oblique_random_forest | adaboost | adaboost_logistic | gradient_boosting | hist_gradient_boosting | xgboost
   params:
     random_state: 42
+    n_jobs: 1        # the CV folds already run in parallel (cv.n_jobs)
   # Other models' params, to swap in. class_weight "balanced" weights each class by 1 / its frequency
   # (GradientBoostingClassifier, GaussianNB and AdaBoost have no class_weight).
   # dummy:                  {}
@@ -167,6 +180,23 @@ model:
   # adaboost_logistic:      {n_estimators: 50, learning_rate: 1.0, random_state: 42}
   # gradient_boosting:      {random_state: 42}
   # hist_gradient_boosting: {random_state: 42, class_weight: balanced}
+  # xgboost:                {random_state: 42, n_jobs: 1}
+
+# Week 8: a learned step between preprocessing and the model. It looks at the labels, so it is
+# inside the Pipeline and re-fit on the training rows of every fold (never selected on all rows).
+feature_selection:
+  enabled: true
+  method: "vote"        # vote (3 models vote) | kbest (best k by F-test) | from_model (random forest importances)
+  min_votes: 2          # vote:  1 (keep almost all) .. 3 (keep only unanimous)
+  k: 6                  # kbest: how many features to keep (13 after preprocessing)
+  random_state: 42
+  search_spaces:        # tuned together with the model when tuning is on (the one for `method` is used)
+    vote:
+      select__min_votes: {type: int, low: 1, high: 3}
+    kbest:
+      select__k: {type: int, low: 2, high: 13}
+    from_model:
+      select__threshold: {type: categorical, choices: ["0.5*mean", "mean", "median"]}
 
 output:
   results_dir: "results"   # each run's full report is saved here as a timestamped .txt file

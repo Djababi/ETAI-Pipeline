@@ -4,10 +4,13 @@ Saving each run's results to disk.
 Printing to the terminal is fine while you're watching it happen, but it's gone the moment you scroll past it or close the window. This module writes the full report (metrics, classification report, fairness table) to a timestamped file in `results/` instead, so you can open it again later, or compare two runs side by side after changing something in config.yaml.
 
 Week 7: every run also adds one row to the scoreboard (`results/runs.csv`), so all runs can be compared.
+Week 8: the header records the feature-selection setting.
 """
 import os
 
 import pandas as pd
+
+from src.model import describe_selection
 
 
 def save_run(results_dir: str, run: str, config: dict, report_text: str) -> str:
@@ -27,6 +30,7 @@ def save_run(results_dir: str, run: str, config: dict, report_text: str) -> str:
         f"random_state: {config['split']['random_state']}\n"
         f"CV: {cv['n_splits']} folds  selection metric: {cv['selection_metric']}  "
         f"metrics: {', '.join(cv['metrics'])}\n"
+        f"Feature selection: {describe_selection(config.get('feature_selection'))}\n"
     )
     tuning = config.get("tuning", {})
     if tuning.get("enabled", False):

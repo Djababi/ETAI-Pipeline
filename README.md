@@ -1,6 +1,23 @@
 
 ## Conclusions
 
+### week 8: Feature selection (+ XGBoost)
+
+**Results** (XGBoost, tuned, nested CV with 15 trials, the same 5 folds, ROC-AUC; corrected paired t-test against *no selection*):
+
+| Feature selection | Nested ROC-AUC mean ± std | Features kept (final model) | vs no selection: diff · wins · p | Run time |
+|---|---|---|---|---|
+| off | 0.726 ± 0.014 | 13 of 13 | — | 27 s |
+| **vote** (combined) | **0.727 ± 0.011** | **3**: `age`, `priors_count`, `priors_per_adult_year` | +0.001 · 3/5 · p = 0.78 | 47 s |
+| kbest (filter) | 0.725 ± 0.012 | 12 (tuned `k` = 12) | −0.001 · 1/5 · p = 0.52 | 30 s |
+| from_model (embedded) | 0.724 ± 0.012 | 7 (threshold `0.5*mean`) | −0.002 · 2/5 · p = 0.57 | 60 s |
+
+**Is the smaller model as good?** Yes. With the vote selector, XGBoost uses only **3 of the 13 columns** and scores the same as with all 13 (0.727 vs 0.726). The difference is far smaller than the noise (p = 0.78, better in only 3 of 5 folds), so selection neither helps nor hurts the score. On COMPAS almost all of the signal comes from age and the number of prior offences. The other columns add very little, and the tuned XGBoost brakes already keep it from overfitting on them. None of the three selectors is significantly different from no selection.
+
+**Would I keep it on?** Yes, the `vote` version. It gives the same score with a model that only looks at 3 columns, which is much easier to explain (important for a risk score used in court) and slightly more stable across folds (std 0.011 vs 0.014). The cost is run time (47 s vs 27 s), which is acceptable. A small model can still be unfair: `age` and `priors_count` can carry racial bias.
+
+
+
 ### week 7: Boosting and metrics
 
 **Selection metric: ROC-AUC.** COMPAS is a risk score used to *rank* people, and choosing the cut-off for "high risk" is a separate decision. ROC-AUC scores the ranking at every threshold at once, so it doesn't depend on the 0.5 cut-off, and it is less noisy than accuracy for comparing models. The other 7 metrics are still reported in every run.
@@ -151,6 +168,7 @@ This table is updated after each practical class, so you can always see what cha
 | 5 | Hyperparameter tuning | `src/tuning.py` (new): Optuna tuning of the whole pipeline (`tune_pipeline()`), an honest score with nested cross-validation (`nested_cross_validate()`) and a tuning report with the optimism check (`tuning_report()`); `build_pipeline()` in `src/model.py`; a `tuning` section in `config.yaml` (on/off, number of trials, folds, one search space per model); `optuna` added to `requirements.txt` |
 | 6 | Ensembles | `oblique_random_forest()` and `adaboost()` in `src/model.py` (+ `adaboost_logistic()`, Challenge 2); their search spaces in `config.yaml`; `add_engineered_features()` in `src/preprocessing.py` (Challenge 1: `priors_per_adult_year`, `juv_total`, `juv_per_year_since_14`) |
 | 7 | Boosting and metrics | `gradient_boosting`, `hist_gradient_boosting` and `naive_bayes` in `_MODELS` with search spaces; several metrics from out-of-fold **probabilities** (`build_scorers()`, `cv.metrics`), one `cv.selection_metric` (ROC-AUC) for tuning and ranking; confusion matrix in the report; `corrected_paired_test()`; the scoreboard `results/runs.csv` (`save_scores()`). Plain-language explanation: `EXPLICACAO_SEMANAS_6_7.md` |
+| 8 | Feature selection (+ XGBoost) | `xgboost` in `_MODELS` with a search space (incl. `gamma`, `reg_alpha`); `VoteSelector` and `build_selector()` in `src/model.py` (Challenge B1: `feature_selection.method` = `vote`, `kbest` or `from_model`); `build_pipeline()` adds a `"select"` step between `"prep"` and `"model"` and takes a cache folder (`memory`); a `feature_selection` section in `config.yaml`, whose search space is tuned with the model; `main.py` prints the features kept; `feature_selection` and `seconds` columns on the scoreboard; the selection setting in the report header; `xgboost` added to `requirements.txt` |
 
 ## Environment setup
 

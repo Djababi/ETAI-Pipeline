@@ -7,4 +7,4 @@ __pycache__/
 results/
 notebooks/
 *.pdf
-EXPLICACAO_SEMANAS_6_7.md
+*.md
